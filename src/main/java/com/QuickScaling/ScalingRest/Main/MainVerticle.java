@@ -35,7 +35,7 @@ public class MainVerticle extends AbstractVerticle
 			startFuture.fail("No mongoDB configuration");
 		}
 		
-		vertx.deployVerticle(new MongoRest(),optionsMongo,res-> {
+		vertx.deployVerticle(new MongoRest(),optionsMongo, res-> {
 			if(res.succeeded()) { 
 				DeploymentOptions optionsRest = new DeploymentOptions();
 				optionsMongo.setWorker(true);
@@ -59,5 +59,6 @@ public class MainVerticle extends AbstractVerticle
 				vertx.deployVerticle(new RestAPI(),optionsRest);
 			}
 		});
+		
 	}
 }
