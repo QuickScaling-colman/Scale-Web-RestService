@@ -12,7 +12,7 @@ export default class Websites extends React.Component {
   restAPI() {
     let me = this;
     $.ajax({
-      url: "http://localhost:8080/GetAllWebsites",
+      url: "/GetAllWebsites",
       dataType: 'json',
       type: 'GET',
       success: function(data) {
@@ -31,7 +31,7 @@ export default class Websites extends React.Component {
 
     if(this.state.Websites.length > 0) {
         for(let website of this.state.Websites) {
-            WebsitesComp.push(<Website key={website.map.URL} websiteData={website}/>)
+            WebsitesComp.push(<Website key={"http://" + website.map.HostName + ":" + website.map.port + website.map.path} websiteData={website}/>)
         }
 
     }
@@ -39,7 +39,7 @@ export default class Websites extends React.Component {
     return (
       <div className={"container-fluid"} style={{marginTop:'15px'}}>
         <div className={"row"}>
-          <div className={"col-md-4"}>
+          <div className={"col-md-6"}>
             {WebsitesComp}
           </div>
         </div>

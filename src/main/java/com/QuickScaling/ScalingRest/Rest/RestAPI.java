@@ -38,13 +38,29 @@ public class RestAPI extends AbstractVerticle{
 		router.get("/GetLatestData/:WebSiteURL/:count").handler(routingContext-> {
 			String WebSiteURL = routingContext.request().getParam("WebSiteURL");
 			int Count = Integer.parseInt(routingContext.request().getParam("count"));
-			WebSiteURL = "http://" + WebSiteURL;
+			WebSiteURL = WebSiteURL;
 			
 			JsonObject QueryObject = new JsonObject();
 			QueryObject.put("WebSiteURL", WebSiteURL);
 			QueryObject.put("Count", Count);
 			
 			vertx.eventBus().send("GET_LATEST_DATA", QueryObject, res -> {
+				if(res.succeeded()) {
+					routingContext.response().end(res.result().body().toString());
+				} else {
+					routingContext.response().end("Error");
+				}
+				
+			});
+		});
+		
+		router.get("/GetLatestData/:count").handler(routingContext-> {
+			int Count = Integer.parseInt(routingContext.request().getParam("count"));
+			
+			JsonObject QueryObject = new JsonObject();
+			QueryObject.put("Min", Count);
+			
+			vertx.eventBus().send("GET_LATEST_DATA_MIN", QueryObject, res -> {
 				if(res.succeeded()) {
 					routingContext.response().end(res.result().body().toString());
 				} else {
@@ -67,7 +83,7 @@ public class RestAPI extends AbstractVerticle{
 		
 		router.route("/*").handler(StaticHandler.create("webroot/public/").setFilesReadOnly(false));
 		
-		server.requestHandler(router::accept).listen(8080);
+		server.requestHandler(router::accept).listen(8002);
 		
 		startFuture.complete();
 	}
