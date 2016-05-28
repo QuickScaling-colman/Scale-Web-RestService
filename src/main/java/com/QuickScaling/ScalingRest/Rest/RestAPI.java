@@ -13,6 +13,13 @@ public class RestAPI extends AbstractVerticle{
 	public void start(Future<Void> startFuture) {	
 		HttpServer server = vertx.createHttpServer();
 		
+		int port = 8080;
+		
+		if(config().getJsonObject("RestConf") != null) {
+			port = config().getJsonObject("RestConf").getInteger("port");
+		}
+		 
+		
 		Router router = Router.router(vertx);
 		
 		router.route("/*").handler(routingContext->{
@@ -20,7 +27,7 @@ public class RestAPI extends AbstractVerticle{
 			routingContext.next();
 		});
 		
-		router.get("/GetByTimrstamp/:TimeStamp").handler(routingContext->{
+		router.get("/GetByTimestamp/:TimeStamp").handler(routingContext->{
 			String TimeStamp = routingContext.request().getParam("TimeStamp");
 			JsonObject QueryObject = new JsonObject();
 			QueryObject.put("TimeStamp", TimeStamp);
@@ -35,14 +42,13 @@ public class RestAPI extends AbstractVerticle{
 			});
 		});
 		
-		router.get("/GetLatestData/:WebSiteURL/:count").handler(routingContext-> {
-			String WebSiteURL = routingContext.request().getParam("WebSiteURL");
-			int Count = Integer.parseInt(routingContext.request().getParam("count"));
-			WebSiteURL = WebSiteURL;
+		router.get("/GetLatestData").handler(routingContext-> {
+			String HostName = "";
+			//int Count = Integer.parseInt(routingContext.request().getParam("count"));
 			
 			JsonObject QueryObject = new JsonObject();
-			QueryObject.put("WebSiteURL", WebSiteURL);
-			QueryObject.put("Count", Count);
+			QueryObject.put("Host", HostName);
+			//QueryObject.put("Count", Count);
 			
 			vertx.eventBus().send("GET_LATEST_DATA", QueryObject, res -> {
 				if(res.succeeded()) {
@@ -81,9 +87,17 @@ public class RestAPI extends AbstractVerticle{
 			});
 		});
 		
+		
+		
 		router.route("/*").handler(StaticHandler.create("webroot/public/").setFilesReadOnly(false));
 		
-		server.requestHandler(router::accept).listen(8002);
+		server.websocketHandler(websocket->{
+			vertx.eventBus().consumer("SEND_TO_WEBSOCKET",res->{
+				websocket.writeFinalTextFrame(res.body().toString());
+			});
+		});
+		
+		server.requestHandler(router::accept).listen(port);
 		
 		startFuture.complete();
 	}

@@ -39,7 +39,7 @@ export default class Websites extends React.Component {
     return (
       <div className={"container-fluid"} style={{marginTop:'15px'}}>
         <div className={"row"}>
-          <div className={"col-md-6"}>
+          <div className={"col-md-12"}>
             {WebsitesComp}
           </div>
         </div>
