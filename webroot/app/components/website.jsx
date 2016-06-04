@@ -11,11 +11,23 @@ var parseDate = d3.time.format("%Y-%m-%d").parse
 export default class Website extends React.Component {
   constructor (props) {
     super(props);
-    this.state = {"responseTimeScale":[],"cpuMemoryScale":[]}
+    this.state = {"responseTimeScale":[],"cpuMemoryScale":[],"ws": new WebSocket("ws://localhost:8002/")}
     this.restGetLatestData();
     var me = this;
     //setInterval(function(){ me.restGetLatestData(); }, 5000);
   }
+
+  websocketInit () {
+      var me = this;
+      var ws = this.state.ws;
+      ws.addEventListener('open', function open() {});
+      ws.addEventListener('message', function incoming(event) {
+        var data = JSON.parse(event.data);
+        me.responseTimeScale(data);
+        me.cpuMemoryScale(data);
+      });
+      ws.addEventListener('close', function close() {});
+    }
 
   restGetLatestData() {
     var me = this;
@@ -26,6 +38,7 @@ export default class Website extends React.Component {
       success: function(data) {
         me.responseTimeScale(data);
         me.cpuMemoryScale(data);
+        me.websocketInit();
       },
       error: function(xhr, status, err) {
         console.error( status, err.toString());
@@ -36,13 +49,15 @@ export default class Website extends React.Component {
   }
 
   cpuMemoryScale(data) {
-    this.state.cpuMemoryScale = [];
+    if(data.CpuRam.length == 0){
+        return;
+    }
 
-    var counterScale = 0;
-    var counterCPUMemory = 0;
-    while(data.CpuRam.length != counterCPUMemory && data.Scale.length != counterScale) {
+    var counterScale = data.Scale.length - 1;
+    var counterCPUMemory = data.CpuRam.length - 1;
+    while(counterCPUMemory != 0 && counterScale != 0) {
         var marge = Object.assign({}, data.CpuRam[counterCPUMemory], data.Scale[counterScale]);
-        marge.Pcpu = marge.cpu * 100 / marge.cpu_limit
+        marge.Pcpu = marge.cpu * 100 / marge.cpu_limit;
 
         if(marge.memory_limit == 0) {
             marge.Pram = 100;
@@ -50,91 +65,91 @@ export default class Website extends React.Component {
             marge.Pram = marge.memory * 100 / marge.memory_limit;
         }
 
-        if(data.CpuRam[counterCPUMemory].JavaDate < data.Scale[counterScale].JavaDate) {
+        if(data.CpuRam[counterCPUMemory].JavaDate > data.Scale[counterScale].JavaDate) {
             marge.date = new Date(data.Scale[counterScale].JavaDate);
+            marge.JavaDate = data.Scale[counterScale].JavaDate;
 
-            counterScale++;
+            counterScale--;
         } else {
             marge.date = new Date(data.CpuRam[counterCPUMemory].JavaDate);
+            marge.JavaDate = data.CpuRam[counterCPUMemory].JavaDate;
 
-            counterCPUMemory++;
+            counterCPUMemory--;
         }
-
-        this.state.cpuMemoryScale.push(marge);
-    }
-
-    if(counterCPUMemory != data.CpuRam.length) {
-        while(data.CpuRam.length != counterCPUMemory) {
-            var marge = Object.assign({}, data.ResponseTime[counterCPUMemory], data.Scale[data.Scale.length - 1]);
-            marge.Pcpu = marge.cpu * 100 / marge.cpu_limit
-
-            if(marge.memory_limit == 0) {
-                marge.Pram = 100;
-            } else {
-                marge.Pram = marge.memory * 100 / marge.memory_limit;
-            }
-            marge.date = new Date(data.CpuRam[counterCPUMemory].JavaDate);
+        if(this.state.cpuMemoryScale.length == 0 || this.state.cpuMemoryScale[this.state.cpuMemoryScale.length - 1].JavaDate < marge.JavaDate) {
             this.state.cpuMemoryScale.push(marge);
-            counterCPUMemory++;
         }
 
     }
-    //
-    // if(data.Scale.length != counterScale) {
-    //     while(data.Scale.length != counterScale) {
-    //         var marge = Object.assign({}, data.CpuRam[data.CpuRam.length - 1], data.Scale[counterScale]);
-    //         marge.Pcpu = marge.cpu * 100 / marge.cpu_limit
-    //
-    //         if(marge.memory_limit == 0) {
-    //             marge.Pram = 100;
-    //         } else {
-    //             marge.Pram = marge.memory * 100 / marge.memory_limit;
-    //         }
-    //         marge.date = new Date(data.Scale[counterScale].JavaDate);
-    //         this.state.cpuMemoryScale.push(marge);
-    //          counterScale++;
-    //     }
-    //
-    // }
 
-    this.setState({"cpuMemoryScale":this.state.cpuMemoryScale.reverse()});
+
+      while(counterCPUMemory != 0) {
+          var marge = Object.assign({}, data.ResponseTime[counterCPUMemory], data.Scale[data.Scale.length - 1]);
+          marge.Pcpu = marge.cpu * 100 / marge.cpu_limit
+
+          if(marge.memory_limit == 0) {
+              marge.Pram = 100;
+          } else {
+              marge.Pram = marge.memory * 100 / marge.memory_limit;
+          }
+          marge.date = new Date(data.CpuRam[counterCPUMemory].JavaDate);
+          marge.JavaDate = data.CpuRam[counterCPUMemory].JavaDate;
+
+          if(this.state.cpuMemoryScale.length == 0 || this.state.cpuMemoryScale[this.state.cpuMemoryScale.length - 1].JavaDate < marge.JavaDate) {
+            this.state.cpuMemoryScale.push(marge);
+          }
+
+          counterCPUMemory--;
+      }
+
+
+
+      this.setState({"cpuMemoryScale":this.state.cpuMemoryScale});
   }
 
   responseTimeScale(data) {
-    this.state.responseTimeScale = [];
+    if(data.ResponseTime.length == 0){
+        return;
+    }
 
-    var counterScale = 0;
-    var counterResponseTime = 0;
-    while(data.ResponseTime.length != counterResponseTime && data.Scale.length != counterScale) {
+    var counterScale = data.Scale.length - 1;
+    var counterResponseTime = data.ResponseTime.length - 1;
+    while(counterResponseTime != 0 && counterScale != 0) {
         var marge = Object.assign({}, data.ResponseTime[counterResponseTime], data.Scale[counterScale]);
         if(data.ResponseTime[counterResponseTime].JavaDate < data.Scale[counterScale].JavaDate ) {
             if(counterResponseTime != 0){
                 marge.date = new Date(data.Scale[counterScale].JavaDate);
-                this.state.responseTimeScale.push(marge);
+                marge.JavaDate = data.Scale[counterScale].JavaDate;
             }
 
-            counterScale++;
+            counterScale--;
         } else {
             marge.date = new Date(data.ResponseTime[counterResponseTime].JavaDate);
-            this.state.responseTimeScale.push(marge);
-            counterResponseTime++;
+            marge.JavaDate = data.ResponseTime[counterResponseTime].JavaDate;
+            counterResponseTime--;
         }
 
-
-    }
-
-    if(counterResponseTime != data.ResponseTime.length) {
-        while(data.ResponseTime.length != counterResponseTime) {
-            var marge = Object.assign({}, data.ResponseTime[counterResponseTime], data.Scale[data.Scale.length - 1]);
-            marge.date = new Date(data.ResponseTime[counterResponseTime].JavaDate);
-            this.state.responseTimeScale.push(marge);
-            counterResponseTime++;
+        if(this.state.responseTimeScale.length == 0 || this.state.responseTimeScale[this.state.responseTimeScale.length - 1].JavaDate < marge.JavaDate) {
+          this.state.responseTimeScale.push(marge);
         }
-
     }
 
 
-    this.setState({"responseTimeScale":this.state.responseTimeScale.reverse()});
+      while(counterResponseTime != 0) {
+          var marge = Object.assign({}, data.ResponseTime[counterResponseTime], data.Scale[data.Scale.length - 1]);
+          marge.date = new Date(data.ResponseTime[counterResponseTime].JavaDate);
+          marge.JavaDate = data.ResponseTime[counterResponseTime].JavaDate;
+
+          if(this.state.responseTimeScale.length == 0 || this.state.responseTimeScale[this.state.responseTimeScale.length - 1].JavaDate < marge.JavaDate) {
+            this.state.responseTimeScale.push(marge);
+          }
+          counterResponseTime--;
+      }
+
+
+
+
+      this.setState({"responseTimeScale":this.state.responseTimeScale});
   }
 
   render () {
@@ -160,7 +175,7 @@ export default class Website extends React.Component {
 
            <ResponseTimeComp width={window.innerWidth} responseTimeScale={this.state.responseTimeScale}/>
 
-           <CpuMemoryComp width={window.innerWidth} cpuMemoryScale={this.state.cpuMemoryScale}/>           
+           <CpuMemoryComp width={window.innerWidth} cpuMemoryScale={this.state.cpuMemoryScale}/>
          </CardText>
        </Card>
       </div>

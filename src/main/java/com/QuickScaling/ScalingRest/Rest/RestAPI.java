@@ -9,6 +9,8 @@ import io.vertx.ext.web.handler.StaticHandler;
 
 public class RestAPI extends AbstractVerticle{
 	
+	
+	
 	@Override
 	public void start(Future<Void> startFuture) {	
 		HttpServer server = vertx.createHttpServer();
@@ -18,8 +20,7 @@ public class RestAPI extends AbstractVerticle{
 		if(config().getJsonObject("RestConf") != null) {
 			port = config().getJsonObject("RestConf").getInteger("port");
 		}
-		 
-		
+
 		Router router = Router.router(vertx);
 		
 		router.route("/*").handler(routingContext->{
@@ -91,10 +92,32 @@ public class RestAPI extends AbstractVerticle{
 		
 		router.route("/*").handler(StaticHandler.create("webroot/public/").setFilesReadOnly(false));
 		
-		server.websocketHandler(websocket->{
-			vertx.eventBus().consumer("SEND_TO_WEBSOCKET",res->{
-				websocket.writeFinalTextFrame(res.body().toString());
+		server.websocketHandler(handler-> {
+			int WebsocketPeriodicSend = 30000;
+			
+			if(config().getJsonObject("RestConf") != null) {
+				WebsocketPeriodicSend = config().getJsonObject("RestConf").getInteger("WebsocketPeriodicSend");
+			}
+			
+			long PeriodicId = vertx.setPeriodic(WebsocketPeriodicSend, periodic->{
+
+					JsonObject QueryObject = new JsonObject();
+					QueryObject.put("Min", 1);
+					
+					vertx.eventBus().send("GET_LATEST_DATA_MIN", QueryObject, res -> {
+						if(res.succeeded()) {
+							handler.writeFinalTextFrame(res.result().body().toString());
+						} else {
+							
+						}
+						
+					});					
 			});
+			
+			handler.closeHandler(res->{
+				vertx.cancelTimer(PeriodicId);
+			});
+			
 		});
 		
 		server.requestHandler(router::accept).listen(port);
