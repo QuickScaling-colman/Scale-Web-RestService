@@ -27,7 +27,7 @@ export default class CpuMemoryComp extends React.Component {
       return (
         <div>
          <h4>CPU RAM</h4>
-         <ChartCanvas key={2} width={this.props.width - 50} height={300}
+         <ChartCanvas key={2} width={this.props.width - 50} height={this.props.height}
            margin={{left: 70, right: 50, top:10, bottom: 30}}
            seriesName="MSFT"
            data={this.props.cpuMemoryScale} type="svg"
@@ -44,7 +44,7 @@ export default class CpuMemoryComp extends React.Component {
 
              <AreaSeries yAccessor={(d) => d.Pram} fill={"#2ca02c"} stroke="#2ca02c"/>
            </Chart>
-           <Chart id={1} yExtents={this.ExtentsScale} height={150} origin={(w, h) => [0, h - 150]}>
+           <Chart id={1} yExtents={this.ExtentsScale} height={this.props.height / 2} origin={(w, h) => [0, h - 150]}>
                 <YAxis axisAt="right" orient="right" ticks={5} tickFormat={d3.format("s")}/>
                 <LineSeries yAccessor={d => d.replicas}/>
            </Chart>

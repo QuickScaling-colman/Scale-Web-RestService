@@ -26,7 +26,7 @@ export default class ResponseTimeComp extends React.Component {
       return (
         <div>
           <h4>Reponse Time</h4>
-          <ChartCanvas key={1} width={this.props.width - 50} height={300}
+          <ChartCanvas key={1} width={this.props.width - 50} height={this.props.height}
             margin={{left: 70, right: 50, top:10, bottom: 30}}
             seriesName="MSFT"
             data={this.props.responseTimeScale} type="hybrid"

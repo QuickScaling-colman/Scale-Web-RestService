@@ -50,6 +50,12 @@ export default class Website extends React.Component {
 
   cpuMemoryScale(data) {
     if(data.CpuRam.length == 0){
+        if(this.state.cpuMemoryScale.length == 0){
+            this.state.cpuMemoryScale.push({"date":new Date(),"Pcpu":0,"Pram":0});
+            this.setState({"cpuMemoryScale":this.state.cpuMemoryScale});
+        }
+
+
         return;
     }
 
@@ -154,9 +160,7 @@ export default class Website extends React.Component {
 
   render () {
     var data = this.state.LatestData;
-    if(this.state.responseTimeScale.length == 0) {
-        return (<div></div>);
-    }
+
     return (
       <div >
         <Card>
@@ -173,9 +177,9 @@ export default class Website extends React.Component {
            }
 
 
-           <ResponseTimeComp width={window.innerWidth} responseTimeScale={this.state.responseTimeScale}/>
+           <ResponseTimeComp width={window.innerWidth * 0.89} height={window.innerHeight * 0.32} responseTimeScale={this.state.responseTimeScale}/>
 
-           <CpuMemoryComp width={window.innerWidth} cpuMemoryScale={this.state.cpuMemoryScale}/>
+           <CpuMemoryComp width={window.innerWidth * 0.89} height={window.innerHeight * 0.32} cpuMemoryScale={this.state.cpuMemoryScale}/>
          </CardText>
        </Card>
       </div>

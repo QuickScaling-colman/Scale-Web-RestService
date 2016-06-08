@@ -11,5 +11,5 @@ import injectTapEventPlugin from 'react-tap-event-plugin';
 injectTapEventPlugin();
 
 ReactDOM.render(<MuiThemeProvider muiTheme={getMuiTheme()}>
-                  <Index />
+                  <Index style={{height:'100%'}}/>
                 </MuiThemeProvider>, document.getElementById('app'));
