@@ -2,6 +2,7 @@ package com.QuickScaling.ScalingRest.Rest;
 
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Future;
+import io.vertx.core.Handler;
 import io.vertx.core.http.HttpServer;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Router;
@@ -92,7 +93,8 @@ public class RestAPI extends AbstractVerticle{
 		
 		router.route("/*").handler(StaticHandler.create("webroot/public/").setFilesReadOnly(false));
 		
-		server.websocketHandler(handler-> {
+		server.websocketHandler(request-> {
+			
 			int WebsocketPeriodicSend = 30000;
 			
 			if(config().getJsonObject("RestConf") != null) {
@@ -106,7 +108,7 @@ public class RestAPI extends AbstractVerticle{
 					
 					vertx.eventBus().send("GET_LATEST_DATA_MIN", QueryObject, res -> {
 						if(res.succeeded()) {
-							handler.writeFinalTextFrame(res.result().body().toString());
+							request.writeFinalTextFrame(res.result().body().toString());
 						} else {
 							
 						}
@@ -114,7 +116,7 @@ public class RestAPI extends AbstractVerticle{
 					});					
 			});
 			
-			handler.closeHandler(res->{
+			request.closeHandler(res->{
 				vertx.cancelTimer(PeriodicId);
 			});
 			

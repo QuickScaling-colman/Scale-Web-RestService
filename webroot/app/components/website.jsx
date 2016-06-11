@@ -11,7 +11,7 @@ var parseDate = d3.time.format("%Y-%m-%d").parse
 export default class Website extends React.Component {
   constructor (props) {
     super(props);
-    this.state = {"responseTimeScale":[],"cpuMemoryScale":[],"ws": new WebSocket("ws://localhost:8002/")}
+    this.state = {"responseTimeScale":[],"cpuMemoryScale":[],"ws": new WebSocket("ws://" + window.location.host + "/")}
     this.restGetLatestData();
     var me = this;
     //setInterval(function(){ me.restGetLatestData(); }, 5000);
@@ -49,7 +49,7 @@ export default class Website extends React.Component {
   }
 
   cpuMemoryScale(data) {
-    if(data.CpuRam.length == 0){
+    if(data.CpuRam.length == 0 || data.Scale.length == 0){
         if(this.state.cpuMemoryScale.length == 0){
             this.state.cpuMemoryScale.push({"date":new Date(),"Pcpu":0,"Pram":0});
             this.setState({"cpuMemoryScale":this.state.cpuMemoryScale});
@@ -114,7 +114,9 @@ export default class Website extends React.Component {
   }
 
   responseTimeScale(data) {
-    if(data.ResponseTime.length == 0){
+    if(data.ResponseTime.length == 0 || data.Scale.length == 0){
+        this.state.responseTimeScale.push({"date":new Date(),"responseTime":0});
+        this.setState({"responseTimeScale":this.state.responseTimeScale});
         return;
     }
 
@@ -122,7 +124,7 @@ export default class Website extends React.Component {
     var counterResponseTime = data.ResponseTime.length - 1;
     while(counterResponseTime != 0 && counterScale != 0) {
         var marge = Object.assign({}, data.ResponseTime[counterResponseTime], data.Scale[counterScale]);
-        if(data.ResponseTime[counterResponseTime].JavaDate < data.Scale[counterScale].JavaDate ) {
+        if(data.ResponseTime[counterResponseTime].JavaDate > data.Scale[counterScale].JavaDate ) {
             if(counterResponseTime != 0){
                 marge.date = new Date(data.Scale[counterScale].JavaDate);
                 marge.JavaDate = data.Scale[counterScale].JavaDate;
@@ -164,7 +166,7 @@ export default class Website extends React.Component {
     return (
       <div >
         <Card>
-         <CardHeader title={<h3> {"http://" + this.props.websiteData.map.HostName + ":" + this.props.websiteData.map.port + this.props.websiteData.map.path.split("?")[0]} </h3>} />
+         <CardHeader title={<h3> {this.props.websiteData.map.name} </h3>} />
          <CardText>
            {
           //  <GraphComponent title={"ResponseTime"}
