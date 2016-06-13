@@ -6,7 +6,6 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.TimeZone;
-
 import java.util.concurrent.TimeUnit;
 
 import com.QuickScaling.ScalingRest.Model.WebsiteData;
@@ -65,8 +64,19 @@ public class MongoRest extends AbstractVerticle{
 		eb.consumer("GET_LATEST_DATA_MIN", request -> {
 			JsonObject jsonResponseTime = new JsonObject(request.body().toString());
 			int Minute = jsonResponseTime.getInteger("Min");
+			String StartDate = jsonResponseTime.getString("StartDate");
+			Date dStartDate = null;
+			if(StartDate != null) {
+				format.setTimeZone(TimeZone.getTimeZone("Israel"));
+				try {
+					dStartDate = format.parse(StartDate);
+				} catch (Exception e) {
+					request.reply("Error parse date");
+					return;
+				}
+			}
 			
-			this.getLatestDataMinute(Minute, resQuery -> {
+			this.getLatestDataMinute(Minute, dStartDate, resQuery -> {
 				try {
 					
 					request.reply(resQuery.toString());
@@ -96,39 +106,72 @@ public class MongoRest extends AbstractVerticle{
 	SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
 	//SimpleDateFormat format2 = new SimpleDateFormat("dd/MM/yyyy, HH:mm:ss'Z'");
 	
-	public void getLatestDataMinute(int minute,Handler<JsonObject> handler) {
+	public void getLatestDataMinute(int minute,Date StartDate,Handler<JsonObject> handler) {
 		CountDownLatch  latch = new CountDownLatch(3, vertx);
 		
-		Calendar cal = Calendar.getInstance();
-		cal.add(Calendar.MINUTE, minute * -1);
+		Calendar calStartTime = Calendar.getInstance();
+		Calendar calEndTimeTime = Calendar.getInstance();
 		
+		JsonObject FilterDateIsrael = new JsonObject();
+		JsonObject FilterDateUTC = new JsonObject();
+		
+		if(StartDate != null) {
+			calStartTime.setTime(StartDate);
+			calEndTimeTime.setTime(StartDate);
+			calEndTimeTime.add(Calendar.MINUTE, minute);
+		} else {
+			calStartTime.add(Calendar.MINUTE, minute * -1);
+			
+		}
+		
+		format.setTimeZone(TimeZone.getTimeZone("Israel"));
+		FilterDateIsrael.put("$gte", new JsonObject().put("$date", format.format(calStartTime.getTime())));
+		FilterDateIsrael.put("$lte", new JsonObject().put("$date", format.format(calEndTimeTime.getTime())));
+		
+		format.setTimeZone(TimeZone.getTimeZone("UTC"));
+		FilterDateUTC.put("$gte", new JsonObject().put("$date", format.format(calStartTime.getTime())));
+		FilterDateUTC.put("$lte", new JsonObject().put("$date", format.format(calEndTimeTime.getTime())));
+		
+		
+		// --------------- ResponseTime -----------------
 		JsonObject QueryObjectResponseTime = new JsonObject();
-		QueryObjectResponseTime.put("date", new JsonObject().put("$gte", new JsonObject().put("$date", format.format(cal.getTime()))));
+		
+		QueryObjectResponseTime.put("date", FilterDateIsrael);
+
+		
 		FindOptions OptionResponseTime = new FindOptions();
 		JsonObject sort = new JsonObject();
 		sort.put("date", -1);
 
 		OptionResponseTime.setSort(sort);
-		
+
+		// --------------- CpuRam -----------------
+		format.setTimeZone(TimeZone.getTimeZone("UTC"));
 		JsonObject QueryObjectCpuRam = new JsonObject();
-		QueryObjectCpuRam.put("timestamp", new JsonObject().put("$gte", new JsonObject().put("$date", format.format(cal.getTime()))));
+		
+		QueryObjectCpuRam.put("timestamp", FilterDateUTC);
+
 		FindOptions OptionCpuRam = new FindOptions();
 		JsonObject sort1 = new JsonObject();
 		sort1.put("timestamp", -1);
 
 		OptionCpuRam.setSort(sort1);		
 		
+		// --------------- Scale -----------------
+		format.setTimeZone(TimeZone.getTimeZone("Israel"));
 		JsonObject QueryObjectScale = new JsonObject();
-		QueryObjectScale.put("date", new JsonObject().put("$gte", new JsonObject().put("$date", format.format(cal.getTime()))));
+		QueryObjectScale.put("date", FilterDateIsrael);
 		FindOptions OptionScale = new FindOptions();
 		JsonObject sort2 = new JsonObject();
 		sort2.put("date", -1);
 
 		OptionScale.setSort(sort2);
 		
+		// --------- Start Query ----------
 		JsonObject Result = new JsonObject();
 		
 		_mongoClient.findWithOptions("websitesResponseTime", QueryObjectResponseTime,OptionResponseTime, res -> {
+			format.setTimeZone(TimeZone.getTimeZone("Israel"));
 			JsonArray ArrResult = new JsonArray();
 			Calendar CurrentDate = Calendar.getInstance();
 			JsonObject CurrentRow = null;
@@ -227,15 +270,22 @@ public class MongoRest extends AbstractVerticle{
 		_mongoClient.findWithOptions("websitesCpuRam", QueryObjectCpuRam ,OptionCpuRam, res1 -> {
 			
 			if(res1.succeeded() && !res1.result().isEmpty() && res1.result().size() > 0) {
+				websiteData.ram = res1.result().get(0).getDouble("memory");
+				websiteData.MaxCpu = res1.result().get(0).getDouble("cpu_limit");
+				websiteData.MaxRam = res1.result().get(0).getDouble("memory_limit");
+				
+				int Count = 0;
+				
 				for (JsonObject entry : res1.result()) {
-					websiteData.cpu += entry.getDouble("cpu");
+					if(websiteData.MaxCpu == entry.getDouble("cpu_limit")) {
+						websiteData.cpu += entry.getDouble("cpu");
+						Count++;
+					}
+					
 
 				}
 				
-				websiteData.cpu = websiteData.cpu / res1.result().size();
-				websiteData.ram = res1.result().get(res1.result().size() - 1).getDouble("memory");
-				websiteData.MaxCpu = res1.result().get(res1.result().size() - 1).getDouble("cpu_limit");
-				websiteData.MaxRam = res1.result().get(res1.result().size() - 1).getDouble("memory_limit");
+				websiteData.cpu = websiteData.cpu / Count;
 			}
 			
 			latch.countDown();
@@ -252,12 +302,20 @@ public class MongoRest extends AbstractVerticle{
 		
 		_mongoClient.findWithOptions("websitesResponseTime", QueryObjectResponseTime, OptionResponseTime, res -> {
 			if(res.succeeded() && !res.result().isEmpty() && res.result().size() > 0) {
+				Double LastEntry = res.result().get(0).getDouble("responseTime");
+				int Count = 0;
+				
 				for (JsonObject entry : res.result()) {
-					websiteData.responseTime += entry.getDouble("responseTime");
-
+					if((LastEntry * 2.5) > entry.getDouble("responseTime")) {
+						websiteData.responseTime += entry.getDouble("responseTime");
+						if(entry.getDouble("responseTime") > LastEntry) {
+							LastEntry = entry.getDouble("responseTime");
+						}
+						Count++;
+					}
 				}
 				
-				websiteData.responseTime = websiteData.responseTime / res.result().size();
+				websiteData.responseTime = websiteData.responseTime / Count;
 			}
 			latch.countDown();
 		});

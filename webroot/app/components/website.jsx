@@ -1,9 +1,9 @@
 import React from 'react';
-import {Card, CardActions, CardHeader, CardMedia, CardTitle, CardText} from 'material-ui';
+import {RaisedButton ,TextField,Card, CardActions, CardHeader, CardMedia, CardTitle, CardText} from 'material-ui';
 import ResponseTimeComp from './response-time-comp.jsx';
 import CpuMemoryComp from './cpu-memory-comp.jsx';
 import GraphComponent from './graph-component.jsx';
-
+import Datetime from 'react-datetime';
 import d3 from 'd3';
 
 var parseDate = d3.time.format("%Y-%m-%d").parse
@@ -11,7 +11,14 @@ var parseDate = d3.time.format("%Y-%m-%d").parse
 export default class Website extends React.Component {
   constructor (props) {
     super(props);
-    this.state = {"responseTimeScale":[],"cpuMemoryScale":[],"ws": new WebSocket("ws://" + window.location.host + "/")}
+    this.state = {"responseTimeScale":[],"cpuMemoryScale":[],"ws": "","open": false,"FilterMinute":200,"FilterDateTime":"","ResponseTimeAvarage":5000, "ResponseTimeAvarageCount":1}
+
+    if(window.location.hostname == "localhost" || window.location.hostname == "127.0.0.1") {
+        this.state.ws = new WebSocket("ws://" + window.location.host + "/");
+    } else {
+        this.state.ws = new WebSocket("ws://ws.quickscaling.ml:8089/");
+    }
+
     this.restGetLatestData();
     var me = this;
     //setInterval(function(){ me.restGetLatestData(); }, 5000);
@@ -139,6 +146,8 @@ export default class Website extends React.Component {
 
         if(this.state.responseTimeScale.length == 0 || this.state.responseTimeScale[this.state.responseTimeScale.length - 1].JavaDate < marge.JavaDate) {
           this.state.responseTimeScale.push(marge);
+          this.state.ResponseTimeAvarage = this.state.ResponseTimeAvarage + marge.responseTime;
+          this.state.ResponseTimeAvarageCount++;
         }
     }
 
@@ -150,14 +159,37 @@ export default class Website extends React.Component {
 
           if(this.state.responseTimeScale.length == 0 || this.state.responseTimeScale[this.state.responseTimeScale.length - 1].JavaDate < marge.JavaDate) {
             this.state.responseTimeScale.push(marge);
+            this.state.ResponseTimeAvarage = this.state.ResponseTimeAvarage + marge.responseTime;
+            this.state.ResponseTimeAvarageCount++;
           }
           counterResponseTime--;
       }
 
 
-
+      this.state.ResponseTimeAvarage = this.state.ResponseTimeAvarage / this.state.ResponseTimeAvarageCount;
+      console.log(this.state.ResponseTimeAvarage);
+      this.state.ResponseTimeAvarageCount = 1;
 
       this.setState({"responseTimeScale":this.state.responseTimeScale});
+  }
+
+  _onMouseLeave() {
+      this.state.responseTimeScale = [];
+      this.state.cpuMemoryScale = [];
+      let QueryWebsocket = {"StartDate":this.state.FilterDateTime,"Min":this.state.FilterMinute};
+      this.state.ws.send(JSON.stringify(QueryWebsocket));
+  }
+
+  _textOnChange(event) {
+      this.state.FilterMinute = parseInt(event.target.value);
+  }
+
+  _DatetimeOnChange(event) {
+      let datetime = new Date(event._d.toString());
+
+      //this.state.FilterDateTime = datetime.getFullYear() + '-' + (datetime.getMonth()+1) + '-' + datetime.getDate() + 'T' + datetime.getHours() + "/" + datetime.getMinutes() + "/" + datetime.getSeconds() + "Z";
+      datetime.setHours( datetime.getHours()+(datetime.getTimezoneOffset()/-60) );
+      this.state.FilterDateTime = datetime.toJSON().slice(0, 19) + 'Z';
   }
 
   render () {
@@ -177,8 +209,14 @@ export default class Website extends React.Component {
           //                  chartSeries={[{field: 'responseTime',name: 'responseTime',color: '#FFC743'},{field: 'replicas',name: 'replicas',color: '#FFC743'}]}
           //                  />
            }
+           <div style={{display:'flex'}}>
+             <div style={{marginTop:'auto',marginBottom:'auto',marginRight:'10px'}}>Start Time:</div>
+             <Datetime className="datetimewebsite" onChange={this._DatetimeOnChange.bind(this)}/>
 
-
+             <div style={{marginTop:'auto',marginBottom:'auto',marginLeft:'50px',marginRight:'10px'}}>Minute:</div>
+              <TextField hintText="200" style={{width:'60px'}} onChange={this._textOnChange.bind(this)}/>
+              <RaisedButton style={{marginTop:'auto',marginBottom:'auto',marginLeft:'30px'}} label="Filter" primary={true} onClick={this._onMouseLeave.bind(this)}/>
+           </div>
            <ResponseTimeComp width={window.innerWidth * 0.89} height={window.innerHeight * 0.32} responseTimeScale={this.state.responseTimeScale}/>
 
            <CpuMemoryComp width={window.innerWidth * 0.89} height={window.innerHeight * 0.32} cpuMemoryScale={this.state.cpuMemoryScale}/>
